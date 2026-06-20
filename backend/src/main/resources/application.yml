@@ -1,0 +1,29 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: messenger-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5432/itsm_db
+    username: fcf_user
+    password: fcf123!
+    driver-class-name: org.postgresql.Driver
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+jwt:
+  secret: messenger-secret-key-min-256-bits-for-hmac-sha256-security-2024
+  expiration: 86400000
+  refresh-expiration: 604800000
+
+logging:
+  level:
+    com.messenger: DEBUG

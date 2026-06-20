@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.messenger.mapper.MessageMapper">
+
+    <resultMap id="MessageResultMap" type="com.messenger.entity.MsgMessage">
+        <id property="id" column="id"/>
+        <result property="roomId" column="room_id"/>
+        <result property="senderId" column="sender_id"/>
+        <result property="content" column="content"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="senderNickname" column="sender_nickname"/>
+        <result property="avatarColor" column="avatar_color"/>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO msg_messages (room_id, sender_id, content, created_at)
+        VALUES (#{roomId}, #{senderId}, #{content}, NOW())
+    </insert>
+
+    <select id="findByRoomId" resultMap="MessageResultMap">
+        SELECT
+            m.id,
+            m.room_id,
+            m.sender_id,
+            m.content,
+            m.created_at,
+            u.nickname AS sender_nickname,
+            u.avatar_color
+        FROM msg_messages m
+        JOIN msg_users u ON u.id = m.sender_id
+        WHERE m.room_id = #{roomId}
+        ORDER BY m.created_at ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findLastMessage" resultMap="MessageResultMap">
+        SELECT
+            m.id,
+            m.room_id,
+            m.sender_id,
+            m.content,
+            m.created_at,
+            u.nickname AS sender_nickname,
+            u.avatar_color
+        FROM msg_messages m
+        JOIN msg_users u ON u.id = m.sender_id
+        WHERE m.room_id = #{roomId}
+        ORDER BY m.created_at DESC
+        LIMIT 1
+    </select>
+
+    <select id="countUnread" resultType="int">
+        SELECT COUNT(*)
+        FROM msg_messages m
+        WHERE m.room_id = #{roomId}
+          AND m.created_at > COALESCE(
+              (SELECT last_read_at FROM msg_room_members
+               WHERE room_id = #{roomId} AND user_id = #{userId}),
+              '1970-01-01'::timestamp
+          )
+          AND m.sender_id != #{userId}
+    </select>
+
+</mapper>

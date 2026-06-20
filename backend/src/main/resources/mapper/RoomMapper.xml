@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.messenger.mapper.RoomMapper">
+
+    <resultMap id="RoomResultMap" type="com.messenger.entity.MsgRoom">
+        <id property="id" column="id"/>
+        <result property="roomType" column="room_type"/>
+        <result property="name" column="name"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="otherNickname" column="other_nickname"/>
+        <result property="unreadCount" column="unread_count"/>
+        <result property="lastMessage" column="last_message"/>
+        <result property="lastMessageAt" column="last_message_at"/>
+    </resultMap>
+
+    <select id="findById" resultMap="RoomResultMap">
+        SELECT id, room_type, name, created_by, created_at
+        FROM msg_rooms
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO msg_rooms (room_type, name, created_by, created_at)
+        VALUES (#{roomType}, #{name}, #{createdBy}, NOW())
+    </insert>
+
+    <insert id="addMember">
+        INSERT INTO msg_room_members (room_id, user_id, joined_at)
+        VALUES (#{roomId}, #{userId}, NOW())
+        ON CONFLICT (room_id, user_id) DO NOTHING
+    </insert>
+
+    <select id="findRoomsByUserId" resultMap="RoomResultMap">
+        SELECT
+            r.id,
+            r.room_type,
+            r.name,
+            r.created_by,
+            r.created_at,
+            CASE
+                WHEN r.room_type = 'DIRECT' THEN other_u.nickname
+                ELSE NULL
+            END AS other_nickname,
+            (
+                SELECT COUNT(*)
+                FROM msg_messages m2
+                WHERE m2.room_id = r.id
+                  AND m2.created_at > COALESCE(rm.last_read_at, '1970-01-01'::timestamp)
+                  AND m2.sender_id != #{userId}
+            ) AS unread_count,
+            (
+                SELECT m3.content
+                FROM msg_messages m3
+                WHERE m3.room_id = r.id
+                ORDER BY m3.created_at DESC
+                LIMIT 1
+            ) AS last_message,
+            (
+                SELECT m4.created_at
+                FROM msg_messages m4
+                WHERE m4.room_id = r.id
+                ORDER BY m4.created_at DESC
+                LIMIT 1
+            ) AS last_message_at
+        FROM msg_rooms r
+        JOIN msg_room_members rm ON rm.room_id = r.id AND rm.user_id = #{userId}
+        LEFT JOIN msg_room_members rm2 ON rm2.room_id = r.id AND rm2.user_id != #{userId} AND r.room_type = 'DIRECT'
+        LEFT JOIN msg_users other_u ON other_u.id = rm2.user_id
+        ORDER BY last_message_at DESC NULLS LAST, r.created_at DESC
+    </select>
+
+    <select id="findDirectRoom" resultMap="RoomResultMap">
+        SELECT r.id, r.room_type, r.name, r.created_by, r.created_at
+        FROM msg_rooms r
+        WHERE r.room_type = 'DIRECT'
+          AND EXISTS (
+              SELECT 1 FROM msg_room_members m1
+              WHERE m1.room_id = r.id AND m1.user_id = #{userId1}
+          )
+          AND EXISTS (
+              SELECT 1 FROM msg_room_members m2
+              WHERE m2.room_id = r.id AND m2.user_id = #{userId2}
+          )
+          AND (
+              SELECT COUNT(*) FROM msg_room_members m3
+              WHERE m3.room_id = r.id
+          ) = 2
+        LIMIT 1
+    </select>
+
+    <select id="isMember" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM msg_room_members
+            WHERE room_id = #{roomId} AND user_id = #{userId}
+        )
+    </select>
+
+    <update id="updateLastRead">
+        UPDATE msg_room_members
+        SET last_read_at = NOW()
+        WHERE room_id = #{roomId} AND user_id = #{userId}
+    </update>
+
+</mapper>

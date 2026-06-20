@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.messenger.mapper.InviteMapper">
+
+    <resultMap id="InviteTokenResultMap" type="com.messenger.entity.MsgInviteToken">
+        <id property="id" column="id"/>
+        <result property="token" column="token"/>
+        <result property="label" column="label"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="maxUses" column="max_uses"/>
+        <result property="useCount" column="use_count"/>
+        <result property="expiresAt" column="expires_at"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <select id="findByToken" resultMap="InviteTokenResultMap">
+        SELECT id, token, label, created_by, max_uses, use_count, expires_at, created_at
+        FROM msg_invite_tokens
+        WHERE token = #{token}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO msg_invite_tokens (token, label, created_by, max_uses, use_count, expires_at, created_at)
+        VALUES (#{token}, #{label}, #{createdBy}, #{maxUses}, #{useCount}, #{expiresAt}, NOW())
+    </insert>
+
+    <update id="incrementUseCount">
+        UPDATE msg_invite_tokens SET use_count = use_count + 1 WHERE token = #{token}
+    </update>
+
+    <select id="findAll" resultMap="InviteTokenResultMap">
+        SELECT id, token, label, created_by, max_uses, use_count, expires_at, created_at
+        FROM msg_invite_tokens
+        ORDER BY created_at DESC
+    </select>
+
+</mapper>

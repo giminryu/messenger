@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.messenger.mapper.UserMapper">
+
+    <resultMap id="UserResultMap" type="com.messenger.entity.MsgUser">
+        <id property="id" column="id"/>
+        <result property="nickname" column="nickname"/>
+        <result property="passwordHash" column="password_hash"/>
+        <result property="inviteTokenUsed" column="invite_token_used"/>
+        <result property="avatarColor" column="avatar_color"/>
+        <result property="isActive" column="is_active"/>
+        <result property="role" column="role"/>
+        <result property="lastSeenAt" column="last_seen_at"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <select id="findById" resultMap="UserResultMap">
+        SELECT id, nickname, password_hash, invite_token_used, avatar_color, is_active, role, last_seen_at, created_at
+        FROM msg_users
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByNickname" resultMap="UserResultMap">
+        SELECT id, nickname, password_hash, invite_token_used, avatar_color, is_active, role, last_seen_at, created_at
+        FROM msg_users
+        WHERE nickname = #{nickname}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO msg_users (nickname, password_hash, invite_token_used, avatar_color, role, is_active, created_at)
+        VALUES (#{nickname}, #{passwordHash}, #{inviteTokenUsed}, #{avatarColor}, #{role}, #{isActive}, NOW())
+    </insert>
+
+    <update id="updateLastSeen">
+        UPDATE msg_users SET last_seen_at = NOW() WHERE id = #{id}
+    </update>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM msg_users
+    </select>
+
+    <select id="findAll" resultMap="UserResultMap">
+        SELECT id, nickname, password_hash, invite_token_used, avatar_color, is_active, role, last_seen_at, created_at
+        FROM msg_users
+        WHERE is_active = TRUE
+        ORDER BY nickname ASC
+    </select>
+
+</mapper>
