@@ -9,7 +9,12 @@ import com.messenger.mapper.MessageMapper;
 import com.messenger.mapper.RoomMapper;
 import com.messenger.security.JwtTokenProvider;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -18,6 +23,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,6 +35,15 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private final RoomMapper roomMapper;
     private final MessageMapper messageMapper;
     private final ObjectMapper objectMapper;
+    private final RestTemplate restTemplate;
+
+    /** FCF 백엔드 내부 알림 엔드포인트 기본 URL */
+    @Value("${fcf.base-url:http://localhost:8080}")
+    private String fcfBaseUrl;
+
+    /** FCF 내부 통신 시크릿 */
+    @Value("${fcf.internal-secret:fcf-messenger-internal-2024}")
+    private String fcfInternalSecret;
 
     // sessionId -> SessionInfo
     private final Map<String, SessionInfo> sessions = new ConcurrentHashMap<>();
@@ -42,6 +57,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
         this.objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        this.restTemplate = new RestTemplate();
     }
 
     @Override
@@ -143,6 +159,9 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
         // Broadcast to all room members regardless of their currentRoomId
         broadcastToRoomMembers(roomId, msgPayload);
+
+        // 오프라인 멤버에게 FCM 푸시 알림 발송
+        sendFcmNotification(roomId, info.getUserId(), info.getNickname(), content);
     }
 
     private void handleLeave(WebSocketSession session, SessionInfo info) throws IOException {
@@ -231,6 +250,39 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             } catch (IOException e) {
                 log.warn("Failed to send to session {}: {}", entry.getKey(), e.getMessage());
             }
+        }
+    }
+
+    /**
+     * FCF 백엔드 내부 알림 엔드포인트를 호출하여 FCM 푸시 알림 발송
+     * 채팅방 멤버 중 발신자를 제외한 전원에게 발송 (수신 여부는 FCF가 판단)
+     *
+     * @param roomId         채팅방 ID
+     * @param senderUserId   발신자 메신저 사용자 ID (제외 대상)
+     * @param senderNickname 발신자 닉네임 (알림 제목으로 사용)
+     * @param content        메시지 내용
+     */
+    private void sendFcmNotification(Long roomId, Long senderUserId, String senderNickname, String content) {
+        try {
+            List<Long> targetFcfUserIds = roomMapper.findMemberFcfUserIds(roomId, senderUserId);
+            if (targetFcfUserIds.isEmpty()) return;
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("senderNickname", senderNickname);
+            payload.put("content", content.length() > 100 ? content.substring(0, 100) + "..." : content);
+            payload.put("targetFcfUserIds", targetFcfUserIds);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("X-Internal-Secret", fcfInternalSecret);
+
+            restTemplate.postForEntity(
+                    fcfBaseUrl + "/api/internal/messenger/notify",
+                    new HttpEntity<>(payload, headers),
+                    Map.class
+            );
+        } catch (Exception e) {
+            log.warn("FCM 알림 발송 요청 실패 — roomId: {}, error: {}", roomId, e.getMessage());
         }
     }
 

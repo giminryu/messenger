@@ -103,4 +103,14 @@
         WHERE room_id = #{roomId} AND user_id = #{userId}
     </update>
 
+    <!-- 채팅방 멤버들의 FCF 사용자 ID 목록 조회 (발신자 제외) -->
+    <select id="findMemberFcfUserIds" resultType="java.lang.Long">
+        SELECT u.fcf_user_id
+        FROM msg_room_members rm
+        JOIN msg_users u ON u.id = rm.user_id
+        WHERE rm.room_id = #{roomId}
+          AND rm.user_id != #{excludeUserId}
+          AND u.fcf_user_id IS NOT NULL
+    </select>
+
 </mapper>

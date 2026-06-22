@@ -5,7 +5,7 @@ spring:
   application:
     name: messenger-backend
   datasource:
-    url: jdbc:postgresql://localhost:5432/itsm_db
+    url: jdbc:postgresql://localhost:5432/fcf_db
     username: fcf_user
     password: fcf123!
     driver-class-name: org.postgresql.Driver
@@ -23,6 +23,12 @@ jwt:
   secret: messenger-secret-key-min-256-bits-for-hmac-sha256-security-2024
   expiration: 86400000
   refresh-expiration: 604800000
+  fcf-secret: fcf-secret-key-for-jwt-token-generation-please-change-in-production-environment
+
+# FCF 백엔드 내부 알림 연동 설정
+fcf:
+  base-url: http://localhost:8080
+  internal-secret: fcf-messenger-internal-2024
 
 logging:
   level:
